@@ -6,6 +6,7 @@
     <title>Neon Puck | Telegram Mini App</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
+	<script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
       /* Piespiežam spēlei aizņemt visu ekrānu bez malām */
       html, body { 
@@ -47,7 +48,7 @@
       <div id="unity-warning"> </div>
     </div>
 
-    <script>
+	<script>
       var canvas = document.querySelector("#unity-canvas");
 
       function unityShowBanner(msg, type) {
@@ -83,7 +84,6 @@
         showBanner: unityShowBanner,
       };
 
-      // Pievienojam mobilās vides iestatījumus
       if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         var meta = document.createElement('meta');
         meta.name = 'viewport';
@@ -100,13 +100,48 @@
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
         }).then((unityInstance) => {
           document.querySelector("#unity-loading-bar").style.display = "none";
-          // Šeit vairs nav Fullscreen pogas koda, kas meta kļūdu
+          
+          if (window.Telegram && window.Telegram.WebApp) {
+              const webApp = window.Telegram.WebApp;
+              webApp.ready();
+              webApp.expand(); // Paplašina aplikāciju pa visu ekrānu
+
+              const user = webApp.initDataUnsafe.user;
+              
+              if (user) {
+                  const userId = user.id.toString();
+                  const userName = user.first_name || user.username || "Player";
+
+                  // 1. Nosūtām ID
+                  unityInstance.SendMessage('CloudSaveManager', 'SetTelegramID', userId);
+
+                  // 2. Nosūtām vārdu
+                  unityInstance.SendMessage('CloudSaveManager', 'SetTelegramName', userName);
+
+                  // 3. Pārbaudām Referral (vai draugs uzaicināja)
+                  const startParam = webApp.initDataUnsafe.start_param;
+                  if (startParam && startParam.startsWith('ref_')) {
+                      const referrerId = startParam.replace('ref_', '');
+                      unityInstance.SendMessage('CloudSaveManager', 'SetReferrerID', referrerId);
+                  }
+              }
+          }
         }).catch((message) => {
           alert(message);
         });
       };
 
       document.body.appendChild(script);
+      
+      // Funkcija draugu uzaicināšanai
+      function shareInviteLink(link) {
+          const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Pievienojies man Neon Puck hokeja spēlē! 🏒');
+          if (window.Telegram && window.Telegram.WebApp) {
+              window.Telegram.WebApp.openTelegramLink(shareUrl);
+          } else {
+              window.open(shareUrl, '_blank');
+          }
+      }
     </script>
   </body>
 </html>
