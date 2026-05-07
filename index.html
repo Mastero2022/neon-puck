@@ -135,7 +135,7 @@
       
       // Funkcija draugu uzaicināšanai
       function shareInviteLink(link) {
-          const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Pievienojies man Neon Puck hokeja spēlē! 🏒');
+          const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Join me for a game of Neon Puck air hockey! 🏒');
           if (window.Telegram && window.Telegram.WebApp) {
               window.Telegram.WebApp.openTelegramLink(shareUrl);
           } else {
