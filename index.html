@@ -106,17 +106,28 @@
               webApp.ready();
               webApp.expand(); // Paplašina aplikāciju pa visu ekrānu
 
-              const user = webApp.initDataUnsafe.user;
-              
-              if (user) {
-                  const userId = user.id.toString();
-                  const userName = user.first_name || user.username || "Player";
+			const user = webApp.initDataUnsafe.user;
 
-                  // 1. Nosūtām ID
-                  unityInstance.SendMessage('CloudSaveManager', 'SetTelegramID', userId);
+			if (user) {
+				const userId = user.id.toString();
+				
+				// Apvienojam vārdu un uzvārdu, ja uzvārds eksistē
+				let fullName = user.first_name || "";
+				if (user.last_name) {
+					fullName += " " + user.last_name;
+				}
+				
+				// Ja abi ir tukši (reti gadījumi), izmantojam username vai "Player"
+				if (fullName.trim() === "") {
+					fullName = user.username || "Player";
+				}
 
-                  // 2. Nosūtām vārdu
-                  unityInstance.SendMessage('CloudSaveManager', 'SetTelegramName', userName);
+				// 1. Nosūtām ID
+				unityInstance.SendMessage('CloudSaveManager', 'SetTelegramID', userId);
+
+				// 2. Nosūtām apvienoto vārdu
+				unityInstance.SendMessage('CloudSaveManager', 'SetTelegramName', fullName);
+    
 
                   // 3. Pārbaudām Referral (vai draugs uzaicināja)
                   const startParam = webApp.initDataUnsafe.start_param;
