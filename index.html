@@ -6,7 +6,7 @@
     <title>Neon Puck | Telegram Mini App</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
-	<script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
       /* Piespiežam spēlei aizņemt visu ekrānu bez malām */
       html, body { 
@@ -48,8 +48,10 @@
       <div id="unity-warning"> </div>
     </div>
 
-	<script>
+    <script>
       var canvas = document.querySelector("#unity-canvas");
+      // 1. IZMAIŅA: Padarām unityInstance pieejamu globāli
+      var myUnityInstance = null; 
 
       function unityShowBanner(msg, type) {
         var warningBanner = document.querySelector("#unity-warning");
@@ -99,43 +101,39 @@
         createUnityInstance(canvas, config, (progress) => {
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
         }).then((unityInstance) => {
+          // Saglabājam instanci globālajā mainīgajā
+          myUnityInstance = unityInstance; 
           document.querySelector("#unity-loading-bar").style.display = "none";
           
           if (window.Telegram && window.Telegram.WebApp) {
               const webApp = window.Telegram.WebApp;
               webApp.ready();
-              webApp.expand(); // Paplašina aplikāciju pa visu ekrānu
+              webApp.expand(); 
 
-			const user = webApp.initDataUnsafe.user;
+            const user = webApp.initDataUnsafe.user;
 
-			if (user) {
-				const userId = user.id.toString();
-				
-				// Apvienojam vārdu un uzvārdu, ja uzvārds eksistē
-				let fullName = user.first_name || "";
-				if (user.last_name) {
-					fullName += " " + user.last_name;
-				}
-				
-				// Ja abi ir tukši (reti gadījumi), izmantojam username vai "Player"
-				if (fullName.trim() === "") {
-					fullName = user.username || "Player";
-				}
+            if (user) {
+                const userId = user.id.toString();
+                
+                let fullName = user.first_name || "";
+                if (user.last_name) {
+                    fullName += " " + user.last_name;
+                }
+                
+                if (fullName.trim() === "") {
+                    fullName = user.username || "Player";
+                }
 
-				// 1. Nosūtām ID
-				unityInstance.SendMessage('CloudSaveManager', 'SetTelegramID', userId);
+                // Sūtām ID uz Unity
+                myUnityInstance.SendMessage('CloudSaveManager', 'SetTelegramID', userId);
 
-				// 2. Nosūtām apvienoto vārdu
-				//unityInstance.SendMessage('CloudSaveManager', 'SetTelegramName', fullName);
-    
-
-                  // 3. Pārbaudām Referral (vai draugs uzaicināja)
-                  const startParam = webApp.initDataUnsafe.start_param;
-                  if (startParam && startParam.startsWith('ref_')) {
-                      const referrerId = startParam.replace('ref_', '');
-                      unityInstance.SendMessage('CloudSaveManager', 'SetReferrerID', referrerId);
-                  }
-              }
+                // Pārbaudām Referral
+                const startParam = webApp.initDataUnsafe.start_param;
+                if (startParam && startParam.startsWith('ref_')) {
+                    const referrerId = startParam.replace('ref_', '');
+                    myUnityInstance.SendMessage('CloudSaveManager', 'SetReferrerID', referrerId);
+                }
+            }
           }
         }).catch((message) => {
           alert(message);
@@ -151,6 +149,45 @@
               window.Telegram.WebApp.openTelegramLink(shareUrl);
           } else {
               window.open(shareUrl, '_blank');
+          }
+      }
+
+      // 2. IZMAIŅA: Funkcija, ko izsauc tavs ShopUI C# skripts
+      function PassPurchaseToTelegram(starsAmount) {
+          if (myUnityInstance !== null) {
+              // Izsaucam CloudSaveManager metodi un padodam līdzi Stars daudzumu
+              myUnityInstance.SendMessage('CloudSaveManager', 'RequestInvoiceFromJS', starsAmount);
+          } else {
+              console.error("Unity instance vēl nav ielādējusies!");
+          }
+      }
+
+      // 3. IZMAIŅA: Funkcija, kas atver reālo Telegram Stars pirkuma logu
+      function triggerTelegramInvoice(starAmount, playFabId) {
+          if (window.Telegram && window.Telegram.WebApp) {
+              window.Telegram.WebApp.openInvoice({
+                  title: "Pucks Pack",
+                  description: "Papildini savu PUCKS bilanci spēlē!",
+                  currency: "XTR", // XTR ir oficiālais Telegram Stars kods
+                  prices: [{ label: "Stars", amount: parseInt(starAmount) }],
+                  payload: playFabId.toString() // Nododam spēlētāja PlayFabID tavam Render botam
+              }, function(status) {
+                  if (status === 'paid') {
+                      console.log("Maksājums veikts! Gaidām, kad bots apstrādās datus...");
+                      
+                      // Iedodam 1.5 sekundi botam pabeigt komunikāciju ar PlayFab
+                      setTimeout(function() {
+                          if (myUnityInstance !== null) {
+                              // Paziņojam Unity, ka laiks atjaunot bilances UI
+                              myUnityInstance.SendMessage('CloudSaveManager', 'OnPaymentSuccess', 'success');
+                          }
+                      }, 1500);
+                  } else {
+                      console.log("Maksājums atcelts vai neizdevās. Statuss: " + status);
+                  }
+              });
+          } else {
+              console.error("Telegram WebApp nav atrasts! Pirkums nav iespējams.");
           }
       }
     </script>
