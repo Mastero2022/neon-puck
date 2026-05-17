@@ -162,33 +162,58 @@
           }
       }
 
-      // 3. IZMAIŅA: Funkcija, kas atver reālo Telegram Stars pirkuma logu
+	  // 3. IZMAIŅA: Funkcija, kas saņem datus no Unity un pieprasa rēķina saiti no bota
       function triggerTelegramInvoice(starAmount, playFabId) {
-          if (window.Telegram && window.Telegram.WebApp) {
-              window.Telegram.WebApp.openInvoice({
-                  title: "Pucks Pack",
-                  description: "Papildini savu PUCKS bilanci spēlē!",
-                  currency: "XTR", // XTR ir oficiālais Telegram Stars kods
-                  prices: [{ label: "Stars", amount: parseInt(starAmount) }],
-                  payload: playFabId.toString() // Nododam spēlētāja PlayFabID tavam Render botam
-              }, function(status) {
-                  if (status === 'paid') {
-                      console.log("Maksājums veikts! Gaidām, kad bots apstrādās datus...");
-                      
-                      // Iedodam 1.5 sekundi botam pabeigt komunikāciju ar PlayFab
-                      setTimeout(function() {
+          console.log("Pieprasām rēķina saiti no Render backend servera...");
+
+          if (!window.Telegram || !window.Telegram.WebApp) {
+              console.error("Telegram WebApp nav atrasts! Pirkums nav iespējams.");
+              return;
+          }
+
+          // SŪTAM PIEPRASĪJUMU UZ TAVU RENDER SERVERI
+          // Nomaini ceļu, ja tavā Node.js kodā tam ir cits nosaukums (piem., /api/invoice vai tml.)
+          fetch('https://neon-puck-backend.onrender.com/create-invoice', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  amount: parseInt(starAmount),
+                  playFabId: playFabId.toString()
+              })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error("Serveris atgrieza kļūdu statusu: " + response.status);
+              }
+              return response.json();
+          })
+          .then(data => {
+              // Pārbaudām, vai no bota saņēmām reālu invoice saiti
+              if (data && data.invoiceLink) {
+                  console.log("Rēķina saite veiksmīgi saņemta: ", data.invoiceLink);
+
+                  // Šeit mēs padodam pareizo saiti, ko pieprasa Telegram API
+                  window.Telegram.WebApp.openInvoice(data.invoiceLink, function(status) {
+                      if (status === 'paid') {
+                          console.log("Maksājums veikts veiksmīgi!");
                           if (myUnityInstance !== null) {
-                              // Paziņojam Unity, ka laiks atjaunot bilances UI
                               myUnityInstance.SendMessage('CloudSaveManager', 'OnPaymentSuccess', 'success');
                           }
-                      }, 1500);
-                  } else {
-                      console.log("Maksājums atcelts vai neizdevās. Statuss: " + status);
-                  }
-              });
-          } else {
-              console.error("Telegram WebApp nav atrasts! Pirkums nav iespējams.");
-          }
+                      } else {
+                          console.log("Maksājums netika pabeigts. Statuss: " + status);
+                      }
+                  });
+              } else {
+                  console.error("Serveris neatsūtīja 'invoiceLink'. Pārbaudi bota atbildi:", data);
+                  alert("Neizdevās izveidot rēķinu. Sazinies ar administratoru.");
+              }
+          })
+          .catch(err => {
+              console.error("Tīkla kļūda, mēģinot sasniegt backend serveri:", err);
+              alert("Kļūda savienojumā ar serveri.");
+          });
       }
     </script>
   </body>
