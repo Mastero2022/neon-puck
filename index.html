@@ -152,27 +152,29 @@
           }
       }
 
-      // 2. IZMAIŅA: Funkcija, ko izsauc tavs ShopUI C# skripts
+	// 2. IZMAIŅA: Šo izsauc vecā valūtas pirkt poga (atstājam saderībai)
       function PassPurchaseToTelegram(starsAmount) {
           if (myUnityInstance !== null) {
-              // Izsaucam CloudSaveManager metodi un padodam līdzi Stars daudzumu
               myUnityInstance.SendMessage('CloudSaveManager', 'RequestInvoiceFromJS', starsAmount);
           } else {
               console.error("Unity instance vēl nav ielādējusies!");
           }
       }
 
-	  // 3. IZMAIŅA: Funkcija, kas saņem datus no Unity un pieprasa rēķina saiti no bota
-      function triggerTelegramInvoice(starAmount, playFabId) {
-          console.log("Pieprasām rēķina saiti no Render backend servera...");
+      // 3. IZMAIŅA: Galvenā funkcija, kas sūta datus uz tavu Render backendu
+      // Tagad tā saņem arī itemType ("currency" vai "skin") un skinId
+      function triggerTelegramInvoice(starAmount, playFabId, itemType, skinId) {
+          console.log(`Pieprasām rēķinu (${itemType}) no Render servera...`);
 
           if (!window.Telegram || !window.Telegram.WebApp) {
               console.error("Telegram WebApp nav atrasts! Pirkums nav iespējams.");
               return;
           }
 
-          // SŪTAM PIEPRASĪJUMU UZ TAVU RENDER SERVERI
-          // Nomaini ceļu, ja tavā Node.js kodā tam ir cits nosaukums (piem., /api/invoice vai tml.)
+          // Ja parametri netiek padoti (vecais valūtas kods), ieliekam default vērtības
+          const type = itemType || "currency";
+          const id = skinId || "none";
+
           fetch('https://neon-puck-backend.onrender.com/create-invoice', {
               method: 'POST',
               headers: {
@@ -180,39 +182,39 @@
               },
               body: JSON.stringify({
                   amount: parseInt(starAmount),
-                  playFabId: playFabId.toString()
+                  playFabId: playFabId.toString(),
+                  itemType: type,
+                  skinId: id
               })
           })
           .then(response => {
-              if (!response.ok) {
-                  throw new Error("Serveris atgrieza kļūdu statusu: " + response.status);
-              }
+              if (!response.ok) throw new Error("Serveris atgrieza kļūdu: " + response.status);
               return response.json();
           })
           .then(data => {
-              // Pārbaudām, vai no bota saņēmām reālu invoice saiti
               if (data && data.invoiceLink) {
-                  console.log("Rēķina saite veiksmīgi saņemta: ", data.invoiceLink);
+                  console.log("Rēķina saite saņemta.");
 
-                  // Šeit mēs padodam pareizo saiti, ko pieprasa Telegram API
                   window.Telegram.WebApp.openInvoice(data.invoiceLink, function(status) {
                       if (status === 'paid') {
                           console.log("Maksājums veikts veiksmīgi!");
                           if (myUnityInstance !== null) {
+                              // Paziņojam Unity, ka jānofrešo dati
                               myUnityInstance.SendMessage('CloudSaveManager', 'OnPaymentSuccess', 'success');
+                              
+                              // Ja tas bija skins, liekam veikalam pārzīmēt izskatu uzreiz
+                              myUnityInstance.SendMessage('ShopManager', 'UpdateAllVisuals', '');
                           }
                       } else {
                           console.log("Maksājums netika pabeigts. Statuss: " + status);
                       }
                   });
               } else {
-                  console.error("Serveris neatsūtīja 'invoiceLink'. Pārbaudi bota atbildi:", data);
-                  alert("Neizdevās izveidot rēķinu. Sazinies ar administratoru.");
+                  console.error("Serveris neatsūtīja invoiceLink:", data);
               }
           })
           .catch(err => {
-              console.error("Tīkla kļūda, mēģinot sasniegt backend serveri:", err);
-              alert("Kļūda savienojumā ar serveri.");
+              console.error("Tīkla kļūda:", err);
           });
       }
     </script>
