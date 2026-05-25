@@ -161,10 +161,9 @@
           }
       }
 
-      // 3. IZMAIŅA: Galvenā funkcija, kas sūta datus uz tavu Render backendu
-      // Tagad tā saņem arī itemType ("currency" vai "skin") un skinId
+	// 3. IZMAIŅA: Galvenā funkcija, kas sūta datus uz tavu Render backendu
       function triggerTelegramInvoice(starAmount, playFabId, itemType, skinId) {
-          console.log(`Pieprasām rēķinu (${itemType}) no Render servera...`);
+          console.log(`Pieprasām rēķinu (${itemType}) no Render servera. Cena: ${starAmount}`);
 
           if (!window.Telegram || !window.Telegram.WebApp) {
               console.error("Telegram WebApp nav atrasts! Pirkums nav iespējams.");
@@ -181,7 +180,7 @@
                   'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                  amount: parseInt(starAmount),
+                  starAmount: starAmount.toString(), // LABOJUMS: Sūtam tieši to, ko index.js gaida
                   playFabId: playFabId.toString(),
                   itemType: type,
                   skinId: id
@@ -193,7 +192,7 @@
           })
           .then(data => {
               if (data && data.invoiceLink) {
-                  console.log("Rēķina saite saņemta.");
+                  console.log("Rēķina saite saņemta veiksmīgi.");
 
                   window.Telegram.WebApp.openInvoice(data.invoiceLink, function(status) {
                       if (status === 'paid') {
