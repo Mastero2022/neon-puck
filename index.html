@@ -201,8 +201,8 @@
                               // Paziņojam Unity, ka jānofrešo dati
                               myUnityInstance.SendMessage('CloudSaveManager', 'OnPaymentSuccess', 'success');
                               
-                              // Ja tas bija skins, liekam veikalam pārzīmēt izskatu uzreiz
-                              myUnityInstance.SendMessage('ShopManager', 'UpdateAllVisuals', '');
+							  // Pārliecināmies, ka pārlādējam inventāru uzreiz
+        					  myUnityInstance.SendMessage('CloudSaveManager', 'ReloadInventory', '');
                           }
                       } else {
                           console.log("Maksājums netika pabeigts. Statuss: " + status);
